@@ -30,9 +30,9 @@ class LogicSwitch {
         this.uuid = homebridge.hap.uuid
 
         // TODO: make whether this is stateful or not configurable
-        const dir = homebridge.user.persistPath();
+        const cacheDir = homebridge.user.persistPath();
         this.storage = require('node-persist');
-        this.storage.initSync({ dir, forgiveParseErrors: true });
+        this.storage.initSync({ dir:cacheDir, forgiveParseErrors: true });
 
         this.name = config.name
 
@@ -66,7 +66,7 @@ class LogicSwitch {
         this.informationService.setCharacteristic(this.Characteristic.Manufacturer, 'Logic Switch')
             .setCharacteristic(this.Characteristic.Model, 'Logic Switch')
             .setCharacteristic(this.Characteristic.FirmwareRevision, require('./package.json').version)
-            .setCharacteristic(this.Characteristic.SerialNumber, this.uuid.generate(this.name))
+            .setCharacteristic(this.Characteristic.SerialNumber, buildSerialNumber(this.name))
     }
 
     _configureSwitches (conditions) {
@@ -76,24 +76,27 @@ class LogicSwitch {
 
             this._createSwitches(inputs)
             this._createSwitches([output])
+            let outputSwitch = this.switches[buildSwitchName(this.name, output)]
 
             const gate = get(condition, 'gate')
-            this.switches[output].gate = upperCase(gate)
+            outputSwitch.gate = upperCase(gate)
 
-            this.switches[output].inputs = inputs
-            inputs.forEach(input => this.switches[input].outputs.push(output))
+            outputSwitch.inputs = inputs
+            inputs.forEach(input => this.switches[buildSwitchName(this.name, input)].outputs.push(outputSwitch.name))
         })
     }
 
     _createSwitches (names) {
         each(names, name => {
-            if (this.switches[name]) {
+            let switchName = this.name + '-' + name
+            if (this.switches[switchName]) {
                 return
             }
 
-            const storedValue = !!this.storage.getItemSync(this.name + name)
-            this.switches[name] = {
-                name: name,
+            const storedValue = !!this.storage.getItemSync(switchName)
+            this.switches[switchName] = {
+                name: switchName,
+                subType: name,
                 value: storedValue,
                 outputs: []
             }
@@ -103,9 +106,9 @@ class LogicSwitch {
     _createServices () {
         each(this.switches, s => {
             if (s.inputs) {
-                s.service = this._createOutputService(s.name)
+                s.service = this._createOutputService(s.name, 'switch')
             } else {
-                s.service = this._createInputService(s.name)
+                s.service = this._createInputService(s.name, 'sensor')
             }
         })
     }
@@ -196,4 +199,12 @@ class LogicSwitch {
 
         Object.keys(this.switches).forEach(this._updateOutputs.bind(this))
     }
+}
+
+function buildSerialNumber (name) {
+    return 'LogicSwitch' + '-' + name.replace(/\s/g, '-')
+}
+
+function buildSwitchName (accessoryName, switchName) {
+    return accessoryName + '-' + switchName
 }
