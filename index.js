@@ -71,24 +71,26 @@ class LogicSwitch {
 
     _configureSwitches (conditions) {
         each(conditions, condition => {
-            const output = get(condition, 'output')
-            const inputs = get(condition, 'inputs')
-
-            this._createSwitches(inputs)
+            const output = buildSwitchName(this.name, get(condition, 'output'))
+	    const inputs = get(condition, 'inputs').map(item => {
+		    return buildSwitchName(this.name, item)
+	    })
+            
+	    this._createSwitches(inputs)
             this._createSwitches([output])
-            let outputSwitch = this.switches[buildSwitchName(this.name, output)]
+            let outputSwitch = this.switches[output]
 
             const gate = get(condition, 'gate')
             outputSwitch.gate = upperCase(gate)
 
             outputSwitch.inputs = inputs
-            inputs.forEach(input => this.switches[buildSwitchName(this.name, input)].outputs.push(outputSwitch.name))
+            inputs.forEach(input => this.switches[input].outputs.push(outputSwitch.name))
         })
     }
 
     _createSwitches (names) {
         each(names, name => {
-            let switchName = this.name + '-' + name
+            let switchName = name
             if (this.switches[switchName]) {
                 return
             }
@@ -206,5 +208,6 @@ function buildSerialNumber (name) {
 }
 
 function buildSwitchName (accessoryName, switchName) {
-    return accessoryName + '-' + switchName
+	return accessoryName + '-' + switchName
+	// return switchName
 }
